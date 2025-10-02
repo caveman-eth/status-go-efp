@@ -36,6 +36,7 @@ import (
 	"github.com/status-im/status-go/services/wallet/collectibles"
 	"github.com/status-im/status-go/services/wallet/community"
 	"github.com/status-im/status-go/services/wallet/currency"
+	"github.com/status-im/status-go/services/wallet/following"
 	"github.com/status-im/status-go/services/wallet/leaderboard"
 	"github.com/status-im/status-go/services/wallet/market"
 	"github.com/status-im/status-go/services/wallet/onramp"
@@ -46,6 +47,7 @@ import (
 	activityfetcher_alchemy "github.com/status-im/status-go/services/wallet/thirdparty/activity/alchemy"
 	"github.com/status-im/status-go/services/wallet/thirdparty/collectibles/alchemy"
 	"github.com/status-im/status-go/services/wallet/thirdparty/collectibles/rarible"
+	"github.com/status-im/status-go/services/wallet/thirdparty/efp"
 	"github.com/status-im/status-go/services/wallet/thirdparty/market/coingecko"
 	"github.com/status-im/status-go/services/wallet/token"
 	"github.com/status-im/status-go/services/wallet/transfer"
@@ -119,6 +121,7 @@ func NewService(
 	var cryptoOnRampProviders []onramp.Provider = []onramp.Provider{}
 	var marketProviders []thirdparty.MarketDataProvider = []thirdparty.MarketDataProvider{}
 	var collectibleProviders thirdparty.CollectibleProviders = thirdparty.CollectibleProviders{}
+	var followingProviders []efp.FollowingDataProvider = []efp.FollowingDataProvider{}
 	var pathProcessors []pathprocessor.PathProcessor = []pathprocessor.PathProcessor{}
 	var leaderboardConfig leaderboard.ServiceConfig = leaderboard.NewDefaultServiceConfig()
 
@@ -186,6 +189,12 @@ func NewService(
 			SearchProviders:            collectibleSearchProviders,
 		}
 
+		// EFP (Ethereum Follow Protocol) providers
+		efpClient := efp.NewClient()
+		followingProviders = []efp.FollowingDataProvider{
+			efpClient,
+		}
+
 		pathProcessors = buildPathProcessors(rpcClient, transactor, tokenManager, ensResolver, featureFlags)
 
 		leaderboardConfig = leaderboard.NewLeaderboardConfig(config.WalletConfig.MarketDataProxyConfig)
@@ -206,6 +215,8 @@ func NewService(
 		feed,
 	)
 	collectibles := collectibles.NewService(db, feed, accountsDB, accountsPublisher, communityManager, rpcClient.GetNetworkManager(), collectiblesManager)
+
+	followingManager := following.NewManager(followingProviders)
 
 	activity := activity.NewService(db, accountsDB, tokenManager, collectiblesManager, feed)
 
@@ -239,6 +250,7 @@ func NewService(
 		cryptoOnRampManager:    cryptoOnRampManager,
 		collectiblesManager:    collectiblesManager,
 		collectibles:           collectibles,
+		followingManager:       followingManager,
 		gethManager:            gethManager,
 		marketManager:          marketManager,
 		transactor:             transactor,
@@ -334,6 +346,7 @@ type Service struct {
 	cryptoOnRampManager    *onramp.Manager
 	collectiblesManager    *collectibles.Manager
 	collectibles           *collectibles.Service
+	followingManager       *following.Manager
 	gethManager            *accsmanagement.AccountsManager
 	marketManager          *market.Manager
 	transactor             *transactions.Transactor
